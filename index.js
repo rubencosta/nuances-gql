@@ -1,4 +1,5 @@
 import express from 'express'
+import cors from 'cors'
 import mongoose from 'mongoose'
 import GraphQLHTTP from 'express-graphql'
 import schema from './data/schema'
@@ -14,4 +15,6 @@ db.once('open', () => {
   app.listen(8000)
 })
 
+app.options('*', cors())
+app.use(cors())
 app.use('/graphql', GraphQLHTTP({schema, graphiql: true}))

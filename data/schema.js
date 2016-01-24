@@ -1,13 +1,23 @@
 import {
   GraphQLSchema,
   GraphQLObjectType,
-  GraphQLList,
-  GraphQLString,
+  GraphQLNonNull,
+  GraphQLID,
+  GraphQLString
 } from 'graphql'
 
-import Nuance from '../models/nuance'
+import {
+  connectionArgs,
+  connectionDefinitions,
+  connectionFromPromisedArray,
+  mutationWithClientMutationId,
+  fromGlobalId,
+  nodeDefinitions
+} from 'graphql-relay'
 
-async function getNuances (){
+import Nuance from './models/nuance'
+
+async function getNuances() {
   try {
     const nuances = await Nuance.find({})
     return nuances
@@ -16,47 +26,75 @@ async function getNuances (){
   }
 }
 
-const wordType = new GraphQLObjectType({
-  name: "Word",
-  fields: () => ({
-    text: {
-      type: GraphQLString,
-    },
-    alias: {
-      type: GraphQLString,
+async function getNuanceById(id) {
+  try {
+    const nuance = await Nuance.findOne({_id: id})
+    return nuance
+  } catch (err) {
+    console.error(err)
+  }
+}
+
+async function createNuance(data) {
+  try {
+    const nuance = new Nuance(data)
+    await nuance.save()
+    return nuance
+  } catch (err) {
+    console.log(err)
+  }
+}
+
+const {nodeInterface, nodeField} = nodeDefinitions(
+  (globalID) => {
+    const {type, id} = fromGlobalId(globalID)
+    if (type === 'Nuance') {
+      return getNuanceById(id)
     }
-  })
-})
+    return null
+  },
+  (obj) => {
+    if (obj instanceof Nuance) {
+      return nuanceType
+    }
+    return null
+  }
+)
 
 const nuanceType = new GraphQLObjectType({
   name: 'Nuance',
   fields: () => ({
-    _id: {
-      type: GraphQLString,
+    id: {
+      type: new GraphQLNonNull(GraphQLID),
+      resolve: (obj) => obj._id,
     },
     word: {
-      type: wordType,
+      type: GraphQLString,
     },
-    image:{
+    image: {
       type: GraphQLString,
     },
     description: {
       type: GraphQLString,
     },
   }),
+  interfaces: [nodeInterface],
 })
+
+const {connectionType: nuanceConnection} = connectionDefinitions({nodeType: nuanceType})
 
 const viewerType = new GraphQLObjectType({
   name: 'Viewer',
   fields: () => ({
-    nuances: {
-      type: new GraphQLList(nuanceType),
-      resolve: () => getNuances()
+    nuanceConnection: {
+      type: nuanceConnection,
+      args: connectionArgs,
+      resolve: (_, args) => connectionFromPromisedArray(getNuances(), args)
     }
   })
 })
 
-var queryType = new GraphQLObjectType({
+const queryType = new GraphQLObjectType({
   name: 'Query',
   fields: () => ({
     viewer: {
@@ -64,9 +102,38 @@ var queryType = new GraphQLObjectType({
       resolve: () => ({})
     }
   })
-});
+})
+
+const createNuanceMutation = mutationWithClientMutationId({
+  name: 'CreateNuance',
+  inputFields: {
+    word: {
+      type: new GraphQLNonNull(GraphQLString)
+    },
+    description: {
+      type: new GraphQLNonNull(GraphQLString)
+    },
+  },
+  outputFields: {
+    nuance: {
+      type: nuanceType,
+      resolve: (nuance) => nuance
+    },
+  },
+  mutateAndGetPayload: (data) => createNuance(data)
+})
+
+const mutationType = new GraphQLObjectType({
+  name: 'Mutation',
+  fields: () => ({
+    node: nodeField,
+    createNuance: createNuanceMutation,
+  })
+})
+
 const schema = new GraphQLSchema({
-  query: queryType
+  query: queryType,
+  mutation: mutationType,
 })
 
 export default schema

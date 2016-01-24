@@ -3,7 +3,8 @@ import {
   GraphQLObjectType,
   GraphQLNonNull,
   GraphQLID,
-  GraphQLString
+  GraphQLString,
+  GraphQLInt
 } from 'graphql'
 
 import {
@@ -19,8 +20,7 @@ import Nuance from './models/nuance'
 
 async function getNuances() {
   try {
-    const nuances = await Nuance.find({})
-    return nuances
+    return await Nuance.find({})
   } catch (err) {
     console.error(err)
   }
@@ -28,8 +28,7 @@ async function getNuances() {
 
 async function getNuanceById(id) {
   try {
-    const nuance = await Nuance.findOne({_id: id})
-    return nuance
+    return await Nuance.findOne({_id: id})
   } catch (err) {
     console.error(err)
   }
@@ -40,6 +39,14 @@ async function createNuance(data) {
     const nuance = new Nuance(data)
     await nuance.save()
     return nuance
+  } catch (err) {
+    console.log(err)
+  }
+}
+
+async function likeNuance(nuanceId) {
+  try {
+    return await Nuance.findByIdAndUpdate(nuanceId, {$inc: {'counters.liked': 1}}).exec()
   } catch (err) {
     console.log(err)
   }
@@ -77,6 +84,16 @@ const nuanceType = new GraphQLObjectType({
     description: {
       type: GraphQLString,
     },
+    counters: {
+      type: new GraphQLObjectType({
+        name: 'NuanceCounters',
+        fields:() => ({
+          liked: {
+            type: GraphQLInt
+          }
+        }),
+      })
+    }
   }),
   interfaces: [nodeInterface],
 })
@@ -123,11 +140,29 @@ const createNuanceMutation = mutationWithClientMutationId({
   mutateAndGetPayload: (data) => createNuance(data)
 })
 
+const likeNuanceMutation = mutationWithClientMutationId({
+  name: "LikeNuance",
+  inputFields: {
+    nuanceId: {
+      type: new GraphQLNonNull(GraphQLID)
+    }
+  },
+  outputFields: {
+    nuance: {
+      type: nuanceType,
+      resolve: (nuance) => nuance
+    }
+  },
+  mutateAndGetPayload: ({nuanceId}) => likeNuance(nuanceId)
+
+})
+
 const mutationType = new GraphQLObjectType({
   name: 'Mutation',
   fields: () => ({
     node: nodeField,
     createNuance: createNuanceMutation,
+    likeNuance: likeNuanceMutation,
   })
 })
 

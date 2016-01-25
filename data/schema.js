@@ -21,11 +21,6 @@ import { Nuance, createNuance, getNuanceById, getNuances, getNuancesByUserId, li
 import { Word, introduceWord, getWordById, getWords } from './models/word'
 import { User, createUser, getUserById, getUserByUsername } from './models/user'
 
-var mongoIdType = {
-  type: new GraphQLNonNull(GraphQLID),
-  resolve: (obj) => obj._id,
-}
-
 const {nodeInterface, nodeField} = nodeDefinitions(
   (globalID) => {
     const {type, id} = fromGlobalId(globalID)
@@ -53,7 +48,7 @@ const {nodeInterface, nodeField} = nodeDefinitions(
 const wordType = new GraphQLObjectType({
   name: 'Word',
   fields: () => ({
-    id: mongoIdType,
+    id: globalIdField('Word'),
     text: {
       type: GraphQLString,
     },
@@ -80,7 +75,7 @@ const allWordsType = new GraphQLObjectType({
 const nuanceType = new GraphQLObjectType({
   name: 'Nuance',
   fields: () => ({
-    id: mongoIdType,
+    id: globalIdField('Nuance'),
     creator: {
       type: userType,
       resolve: (obj) => getUserById(obj.creator)
@@ -114,7 +109,7 @@ const {connectionType: nuanceConnection} = connectionDefinitions({nodeType: nuan
 const userType = new GraphQLObjectType({
   name: 'User',
   fields: () => ({
-    id: mongoIdType,
+    id: globalIdField('User'),
     auth: {
       type: new GraphQLObjectType({
         name: 'UserAuth',
@@ -208,7 +203,7 @@ const createNuanceMutation = mutationWithClientMutationId({
   },
   mutateAndGetPayload: (data) => createNuance({
     ...data,
-    user: fromGlobalId(data.user).id,
+    creator: fromGlobalId(data.user).id,
     word: fromGlobalId(data.word).id,
   })
 })

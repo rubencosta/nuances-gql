@@ -10,7 +10,12 @@
   "author": "Ruben Costa",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.13.4"
+    "cors": "^2.7.1",
+    "express": "^4.13.4",
+    "express-graphql": "^0.4.5",
+    "graphql": "^0.4.14",
+    "graphql-relay": "^0.3.6",
+    "mongoose": "^4.3.6"
   },
   "devDependencies": {
     "babel-cli": "^6.4.5",

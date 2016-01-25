@@ -10,11 +10,14 @@
   "author": "Ruben Costa",
   "license": "MIT",
   "dependencies": {
+    "body-parser": "^1.14.2",
     "cors": "^2.7.1",
     "express": "^4.13.4",
     "express-graphql": "^0.4.5",
+    "express-jwt": "^3.3.0",
     "graphql": "^0.4.14",
     "graphql-relay": "^0.3.6",
+    "jsonwebtoken": "^5.5.4",
     "mongoose": "^4.3.6"
   },
   "devDependencies": {

@@ -13,6 +13,7 @@ import {
   connectionFromPromisedArray,
   mutationWithClientMutationId,
   fromGlobalId,
+  globalIdField,
   nodeDefinitions
 } from 'graphql-relay'
 
@@ -162,10 +163,14 @@ const queryType = new GraphQLObjectType({
       type: userType,
       args: {
         username: {
-          type: new GraphQLNonNull(GraphQLString),
+          type: GraphQLString,
         },
       },
-      resolve: (_, {username}) => getUserByUsername(username)
+      resolve: (root, {username}) => getUserByUsername(username)
+    },
+    currentUser: {
+      type: userType,
+      resolve: (root, args, {rootValue: {user}}) => user ? getUserById(user._id) : null
     },
     allNuances: {
       type: allNuancesType,

@@ -33,24 +33,30 @@ const userSchema = new mongoose.Schema({
 
 const generateHash = (password) => bcrypt.hashSync(password, 10)
 
-userSchema.methods.isValidPassword = (password) => bcrypt.compareSync(password, this.auth.local.password)
+userSchema.methods.isValidPassword = function(password) {
+  return bcrypt.compareSync(password, this.auth.local.password)
+}
 
 export const User = mongoose.model('User', userSchema)
 
 export async function createUser({username, email, password}) {
   //TODO: validate email
-  const user = new User({
-    auth:{
-      local: {
-        username: username.toLowerCase(),
-        alias: username,
-        email,
-        password: generateHash(password)
-      }
-    },
-  })
-  await user.save()
-  return user
+  try {
+    const user = new User({
+      auth: {
+        local: {
+          username: username.toLowerCase(),
+          alias: username,
+          email,
+          password: generateHash(password)
+        }
+      },
+    })
+    await user.save()
+    return user
+  } catch (err) {
+    throw err
+  }
 }
 
 export async function getUserById(id) {

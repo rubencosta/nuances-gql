@@ -37,7 +37,7 @@ app.use(
   }))
 )
 
-app.post('/authenticate', bodyParser(), (req, res) => {
+app.post('/authenticate', bodyParser.json(), (req, res) => {
   getUserByUsername(req.body.username)
     .then((user) => {
       if (user.isValidPassword(req.body.password)) {
@@ -46,8 +46,7 @@ app.post('/authenticate', bodyParser(), (req, res) => {
       throw new Error('invalid password')
     })
     .then((user) => {
-      console.log(user.toObject())
-      const token = jwt.sign(user.toObject(), secret, {expiresInMinutes: 5})
+      const token = jwt.sign(user.toObject(), secret, {expiresInMinutes: 5 * 60})
       res.json({token})
     })
     .catch((err) => {

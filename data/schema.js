@@ -16,40 +16,13 @@ import {
   nodeDefinitions
 } from 'graphql-relay'
 
-import Nuance from './models/nuance'
+import { Nuance, createNuance, getNuanceById, getNuances, getNuancesByUserId, likeNuance } from './models/nuance'
+import { Word, introduceWord, getWordById, getWords } from './models/word'
+import { User, createUser, getUserById, getUserByUsername } from './models/user'
 
-async function getNuances() {
-  try {
-    return await Nuance.find({})
-  } catch (err) {
-    console.error(err)
-  }
-}
-
-async function getNuanceById(id) {
-  try {
-    return await Nuance.findOne({_id: id})
-  } catch (err) {
-    console.error(err)
-  }
-}
-
-async function createNuance(data) {
-  try {
-    const nuance = new Nuance(data)
-    await nuance.save()
-    return nuance
-  } catch (err) {
-    console.log(err)
-  }
-}
-
-async function likeNuance(nuanceId) {
-  try {
-    return await Nuance.findByIdAndUpdate(nuanceId, {$inc: {'counters.liked': 1}}).exec()
-  } catch (err) {
-    console.log(err)
-  }
+var mongoIdType = {
+  type: new GraphQLNonNull(GraphQLID),
+  resolve: (obj) => obj._id,
 }
 
 const {nodeInterface, nodeField} = nodeDefinitions(
@@ -57,26 +30,63 @@ const {nodeInterface, nodeField} = nodeDefinitions(
     const {type, id} = fromGlobalId(globalID)
     if (type === 'Nuance') {
       return getNuanceById(id)
+    } else if (type === 'Word') {
+      return getWordById(id)
+    } else if (type === 'User') {
+      return getUserById(id)
     }
     return null
   },
   (obj) => {
     if (obj instanceof Nuance) {
       return nuanceType
+    } else if (obj instanceof Word) {
+      return wordType
+    } else if (obj instanceof User) {
+      return userType
     }
     return null
   }
 )
 
+const wordType = new GraphQLObjectType({
+  name: 'Word',
+  fields: () => ({
+    id: mongoIdType,
+    text: {
+      type: GraphQLString,
+    },
+    alias: {
+      type: GraphQLString,
+    }
+  }),
+  interfaces: [nodeInterface],
+})
+
+const {connectionType: wordConnection} = connectionDefinitions({nodeType: wordType})
+
+const allWordsType = new GraphQLObjectType({
+  name: 'AllWords',
+  fields: () => ({
+    wordConnection: {
+      type: wordConnection,
+      args: connectionArgs,
+      resolve: (_, args) => connectionFromPromisedArray(getWords(), args)
+    },
+  }),
+})
+
 const nuanceType = new GraphQLObjectType({
   name: 'Nuance',
   fields: () => ({
-    id: {
-      type: new GraphQLNonNull(GraphQLID),
-      resolve: (obj) => obj._id,
+    id: mongoIdType,
+    creator: {
+      type: userType,
+      resolve: (obj) => getUserById(obj.creator)
     },
     word: {
-      type: GraphQLString,
+      type: wordType,
+      resolve: (obj) => getWordById(obj.word)
     },
     image: {
       type: GraphQLString,
@@ -87,35 +97,82 @@ const nuanceType = new GraphQLObjectType({
     counters: {
       type: new GraphQLObjectType({
         name: 'NuanceCounters',
-        fields:() => ({
+        fields: () => ({
           liked: {
             type: GraphQLInt
-          }
+          },
         }),
-      })
-    }
+      }),
+    },
   }),
   interfaces: [nodeInterface],
 })
 
 const {connectionType: nuanceConnection} = connectionDefinitions({nodeType: nuanceType})
 
-const viewerType = new GraphQLObjectType({
-  name: 'Viewer',
+const userType = new GraphQLObjectType({
+  name: 'User',
+  fields: () => ({
+    id: mongoIdType,
+    auth: {
+      type: new GraphQLObjectType({
+        name: 'UserAuth',
+        fields: ()=>({
+          local: {
+            type: new GraphQLObjectType({
+              name: 'UserAuthLocal',
+              fields: () => ({
+                username: {
+                  type: GraphQLString,
+                },
+                email: {
+                  type: GraphQLString,
+                },
+              }),
+            }),
+          },
+        }),
+      })
+    },
+    nuanceConnection: {
+      type: nuanceConnection,
+      args: connectionArgs,
+      resolve: (obj, args) => connectionFromPromisedArray(getNuancesByUserId(obj.id), args)
+    }
+  }),
+  interfaces: [nodeInterface],
+})
+
+const allNuancesType = new GraphQLObjectType({
+  name: 'AllNuances',
   fields: () => ({
     nuanceConnection: {
       type: nuanceConnection,
       args: connectionArgs,
       resolve: (_, args) => connectionFromPromisedArray(getNuances(), args)
     }
-  })
+  }),
 })
 
 const queryType = new GraphQLObjectType({
   name: 'Query',
   fields: () => ({
-    viewer: {
-      type: viewerType,
+    node: nodeField,
+    user: {
+      type: userType,
+      args: {
+        username: {
+          type: new GraphQLNonNull(GraphQLString),
+        },
+      },
+      resolve: (_, {username}) => getUserByUsername(username)
+    },
+    allNuances: {
+      type: allNuancesType,
+      resolve: () => ({})
+    },
+    allWords: {
+      type: allWordsType,
       resolve: () => ({})
     }
   })
@@ -124,11 +181,14 @@ const queryType = new GraphQLObjectType({
 const createNuanceMutation = mutationWithClientMutationId({
   name: 'CreateNuance',
   inputFields: {
+    user: {
+      type: new GraphQLNonNull(GraphQLID),
+    },
     word: {
-      type: new GraphQLNonNull(GraphQLString)
+      type: new GraphQLNonNull(GraphQLID),
     },
     description: {
-      type: new GraphQLNonNull(GraphQLString)
+      type: new GraphQLNonNull(GraphQLString),
     },
   },
   outputFields: {
@@ -136,12 +196,61 @@ const createNuanceMutation = mutationWithClientMutationId({
       type: nuanceType,
       resolve: (nuance) => nuance
     },
+    user: {
+      type: userType,
+      resolve: (nuance) => getUserById(nuance.creator)
+    }
   },
-  mutateAndGetPayload: (data) => createNuance(data)
+  mutateAndGetPayload: (data) => createNuance({
+    ...data,
+    user: fromGlobalId(data.user).id,
+    word: fromGlobalId(data.word).id,
+  })
+})
+
+const introduceWordMutation = mutationWithClientMutationId({
+  name: 'IntroduceWord',
+  inputFields: {
+    text: {
+      type: new GraphQLNonNull(GraphQLString)
+    },
+    alias: {
+      type: new GraphQLNonNull(GraphQLString)
+    },
+  },
+  outputFields: {
+    word: {
+      type: wordType,
+      resolve: (word) => word
+    },
+  },
+  mutateAndGetPayload: (data) => introduceWord(data)
+})
+
+const createUserMutation = mutationWithClientMutationId({
+  name: 'CreateUser',
+  inputFields: {
+    username: {
+      type: new GraphQLNonNull(GraphQLString)
+    },
+    email: {
+      type: new GraphQLNonNull(GraphQLString)
+    },
+    password: {
+      type: new GraphQLNonNull(GraphQLString)
+    }
+  },
+  outputFields: {
+    user: {
+      type: userType,
+      resolve: (user) => user,
+    }
+  },
+  mutateAndGetPayload: (data) => createUser(data)
 })
 
 const likeNuanceMutation = mutationWithClientMutationId({
-  name: "LikeNuance",
+  name: 'LikeNuance',
   inputFields: {
     nuanceId: {
       type: new GraphQLNonNull(GraphQLID)
@@ -160,9 +269,10 @@ const likeNuanceMutation = mutationWithClientMutationId({
 const mutationType = new GraphQLObjectType({
   name: 'Mutation',
   fields: () => ({
-    node: nodeField,
+    createUser: createUserMutation,
     createNuance: createNuanceMutation,
     likeNuance: likeNuanceMutation,
+    introduceWord: introduceWordMutation,
   })
 })
 

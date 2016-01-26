@@ -46,7 +46,7 @@ app.post('/authenticate', bodyParser.json(), (req, res) => {
       throw new Error('invalid password')
     })
     .then((user) => {
-      const token = jwt.sign(user.toObject(), secret, {expiresInMinutes: 5 * 60})
+      const token = jwt.sign(user.toObject(), secret, {expiresIn: 5 * 60 * 60})
       res.json({token})
     })
     .catch((err) => {

@@ -7,10 +7,13 @@ import mongoose from 'mongoose'
 import GraphQLHTTP from 'express-graphql'
 import schema from './data/schema'
 import { getUserByUsername } from './data/models/user'
+import multer from 'multer'
+import os from 'os'
 
 const secret = 'secret'
 
 const app = express()
+const upload = multer({dest: os.tmpdir()})
 
 mongoose.set('debug', true)
 mongoose.connect('mongodb://localhost/nuances')
@@ -30,10 +33,11 @@ app.use(
     secret,
     credentialsRequired: false,
   }),
+  upload.single('image'),
   GraphQLHTTP((req) => ({
     schema,
     graphiql: true,
-    rootValue: {user: req.user}
+    rootValue: {req}
   }))
 )
 

@@ -165,7 +165,7 @@ const queryType = new GraphQLObjectType({
     },
     currentUser: {
       type: userType,
-      resolve: (root, args, {rootValue: {user}}) => user ? getUserById(user._id) : null
+      resolve: (root, args, {rootValue: {req: {user}}}) => user ? getUserById(user._id) : null
     },
     allNuances: {
       type: allNuancesType,
@@ -189,7 +189,7 @@ const createNuanceMutation = mutationWithClientMutationId({
     },
     description: {
       type: new GraphQLNonNull(GraphQLString),
-    },
+    }
   },
   outputFields: {
     nuance: {
@@ -201,8 +201,9 @@ const createNuanceMutation = mutationWithClientMutationId({
       resolve: (nuance) => getUserById(nuance.creator)
     }
   },
-  mutateAndGetPayload: (data) => createNuance({
+  mutateAndGetPayload: (data, {rootValue: {req: {file}}}) => createNuance({
     ...data,
+    image: `${file.filename}.${file.mimetype.split('/').reverse().shift()}`,
     creator: fromGlobalId(data.user).id,
     word: fromGlobalId(data.word).id,
   })

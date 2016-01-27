@@ -8,23 +8,27 @@ import GraphQLHTTP from 'express-graphql'
 import schema from './data/schema'
 import { getUserByUsername } from './data/models/user'
 import multer from 'multer'
-import os from 'os'
 import path from 'path'
 import grpc from 'grpc'
+import uuid from 'uuid'
 
 const secret = 'secret'
 
 const {imgresizer: {ImgResizer}} = grpc.load(path.join(__dirname, 'proto/img_resize.proto'))
 const imgresizerClient = new ImgResizer('localhost:8888', grpc.credentials.createInsecure())
 const app = express()
-const upload = multer({dest: os.tmpdir()})
+const multerStorage = multer.diskStorage({
+  filename(req, file, cb) {
+    cb(null, `${uuid()}.${file.originalname.split('.').reverse().shift()}`)
+  }
+})
+const upload = multer({storage: multerStorage})
 
 mongoose.set('debug', true)
 mongoose.connect('mongodb://localhost/nuances')
 const {connection: db} = mongoose
 db.on('error', (err) => console.error(err))
 db.once('open', () => {
-  console.log('db opened')
   app.listen(8000)
 })
 
@@ -42,9 +46,7 @@ app.use(
     if (!req.file) {
       return next()
     }
-    console.log('making grpc req')
-    console.log(req.file.filename)
-    return imgresizerClient.processImg(req.file.filename, (err, {url}) => {
+    return imgresizerClient.processImg(req.file.path, (err, {url} = {}) => {
       if (err) {
         return next(err)
       }

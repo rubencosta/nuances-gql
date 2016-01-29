@@ -9,15 +9,20 @@ import schema from './data/schema'
 import { getUserByUsername } from './data/models/user'
 import multer from 'multer'
 import path from 'path'
-import grpc from 'grpc'
 import uuid from 'uuid'
+import nats from 'nats'
+import protobuf from 'protobufjs'
 
 const secret = 'secret'
 
-const {imgresizer: {ImgResizer}} = grpc.load(path.join(__dirname, 'proto/img_resize.proto'))
-const imgresizerClient = new ImgResizer('localhost:8888', grpc.credentials.createInsecure())
+const {ImgUrl} = protobuf.loadProtoFile('proto/img_resize.proto').build('imgresizer')
+const natsClient = nats.connect()
+
 const app = express()
 const multerStorage = multer.diskStorage({
+  destination(req, file, cb) {
+    cb(null, path.join(__dirname, 'upload'))
+  },
   filename(req, file, cb) {
     cb(null, `${uuid()}.${file.originalname.split('.').reverse().shift()}`)
   }
@@ -31,10 +36,9 @@ db.on('error', (err) => console.error(err))
 db.once('open', () => {
   app.listen(8000)
 })
-
 app.options('*', cors())
 app.use(cors())
-
+app.use(express.static(path.join(__dirname, '/upload')))
 app.use(
   '/graphql',
   expressJwt({
@@ -46,13 +50,9 @@ app.use(
     if (!req.file) {
       return next()
     }
-    return imgresizerClient.processImg(req.file.path, (err, {url} = {}) => {
-      if (err) {
-        return next(err)
-      }
-      req.file = url
-      return next()
-    })
+    natsClient.publish('image.resize', new ImgUrl({url: req.file.path}).encode().buffer)
+    req.file = req.file.filename
+    next()
   },
   GraphQLHTTP((req) => ({
     schema,

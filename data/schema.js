@@ -4,7 +4,8 @@ import {
   GraphQLNonNull,
   GraphQLID,
   GraphQLString,
-  GraphQLInt
+  GraphQLInt,
+
 } from 'graphql'
 
 import {
@@ -14,7 +15,7 @@ import {
   mutationWithClientMutationId,
   fromGlobalId,
   globalIdField,
-  nodeDefinitions
+  nodeDefinitions,
 } from 'graphql-relay'
 
 import { Nuance, createNuance, getNuanceById, getNuances, getNuancesByUserId, likeNuance } from './models/nuance'

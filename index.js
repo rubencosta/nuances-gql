@@ -15,10 +15,11 @@ import protobuf from 'protobufjs'
 
 const secret = 'secret'
 
-const {ImgUrl} = protobuf.loadProtoFile('proto/img_resize.proto').build('imgresizer')
+//NATS
+const {Request} = protobuf.loadProtoFile('proto/img_resize.proto').build('imgresizer')
 const natsClient = nats.connect()
 
-const app = express()
+//MULTER
 const multerStorage = multer.diskStorage({
   destination(req, file, cb) {
     cb(null, path.join(__dirname, 'upload'))
@@ -29,6 +30,8 @@ const multerStorage = multer.diskStorage({
 })
 const upload = multer({storage: multerStorage})
 
+const app = express()
+
 mongoose.set('debug', true)
 mongoose.connect('mongodb://localhost/nuances')
 const {connection: db} = mongoose
@@ -36,9 +39,12 @@ db.on('error', (err) => console.error(err))
 db.once('open', () => {
   app.listen(8000)
 })
+
+//CORS
 app.options('*', cors())
 app.use(cors())
-app.use(express.static(path.join(__dirname, '/upload')))
+
+//GQL
 app.use(
   '/graphql',
   expressJwt({
@@ -50,7 +56,11 @@ app.use(
     if (!req.file) {
       return next()
     }
-    natsClient.publish('image.resize', new ImgUrl({url: req.file.path}).encode().buffer)
+    natsClient.publish('image.resize', new Request({
+      url: req.file.path,
+      width: 400,
+      height: 400,
+    }).encode().buffer)
     req.file = req.file.filename
     next()
   },
@@ -61,6 +71,10 @@ app.use(
   }))
 )
 
+//STATIC
+app.use(express.static(path.join(__dirname, '/upload')))
+
+//AUTH
 app.post('/authenticate', bodyParser.json(), (req, res) => {
   getUserByUsername(req.body.username)
     .then((user) => {

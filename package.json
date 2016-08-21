@@ -20,7 +20,10 @@
     "graphql-relay": "^0.3.6",
     "jsonwebtoken": "^5.5.4",
     "mongoose": "^4.3.6",
-    "multer": "^1.1.0"
+    "multer": "^1.1.0",
+    "nats": "^0.5.4",
+    "protobufjs": "^5.0.1",
+    "uuid": "^2.0.1"
   },
   "devDependencies": {
     "babel-cli": "^6.4.5",

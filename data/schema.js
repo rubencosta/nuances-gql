@@ -4,7 +4,8 @@ import {
   GraphQLNonNull,
   GraphQLID,
   GraphQLString,
-  GraphQLInt
+  GraphQLInt,
+
 } from 'graphql'
 
 import {
@@ -14,7 +15,7 @@ import {
   mutationWithClientMutationId,
   fromGlobalId,
   globalIdField,
-  nodeDefinitions
+  nodeDefinitions,
 } from 'graphql-relay'
 
 import { Nuance, createNuance, getNuanceById, getNuances, getNuancesByUserId, likeNuance } from './models/nuance'
@@ -203,7 +204,7 @@ const createNuanceMutation = mutationWithClientMutationId({
   },
   mutateAndGetPayload: (data, {rootValue: {req: {file}}}) => createNuance({
     ...data,
-    image: `${file.filename}.${file.mimetype.split('/').reverse().shift()}`,
+    image: file,
     creator: fromGlobalId(data.user).id,
     word: fromGlobalId(data.word).id,
   })
